@@ -1,0 +1,15 @@
+{
+  "name": "泰语高频核心词汇 5000",
+  "short_name": "泰语5000词",
+  "description": "泰鱼翻译汇编 · 泰语高频核心词汇点读、记忆卡片与拼写训练",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F7F4FC",
+  "theme_color": "#5A4799",
+  "lang": "zh-CN",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
