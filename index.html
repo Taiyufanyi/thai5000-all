@@ -237,7 +237,6 @@ html.locked body { overflow: hidden; }
       <button class="tab" role="tab" id="tab-learn" aria-selected="false" data-v="learn">记忆卡片</button>
       <button class="tab" role="tab" id="tab-spell" aria-selected="false" data-v="spell">拼写训练</button>
       <button class="tab" role="tab" id="tab-star" aria-selected="false" data-v="star">生词本</button>
-      <button class="tab" role="tab" id="tab-pdf" aria-selected="false" data-v="pdf">词书PDF</button>
     </div>
     <div class="filters">
       <div class="lvls" id="lvls"></div>
@@ -259,12 +258,6 @@ html.locked body { overflow: hidden; }
   <section id="v-list"><div class="resume" id="resume"><span id="resumeMsg">还没有标记学习位置。学完一个词，点词条上的“学到这里”。</span><button class="resume-btn" id="resumeBtn" disabled>继续上次学习</button></div><div class="count" id="count"></div><div class="list" id="list"></div><button class="more" id="more" hidden>再显示 40 个</button></section>
   <section id="v-learn" hidden></section>
   <section id="v-spell" hidden></section>
-  <section id="v-pdf" hidden>
-    <div class="pdf-intro">和纸质版一样的 PDF 词书（含音标、全部义项和例句）。点“打开”在手机上直接翻看；点“全部保存到本机”后，断网也能打开。</div>
-    <div class="pdf-list" id="pdflist"></div>
-    <button class="btn" id="pdfsave">全部保存到本机（约 18MB）</button>
-    <p class="foot" id="pdfinfo"></p>
-  </section>
   <section id="v-star" hidden><div class="count" id="scount"></div><div class="list" id="slist"></div></section>
   <p class="foot" id="offinfo"></p>
   <p class="foot">单词和例句都使用固定录音（泰语女声），任何手机、电脑都能播放，不需要装语音包。想断网使用，可以点“下载单词离线录音”（约 57MB）和“下载例句离线录音”（约 108MB），建议连 Wi-Fi；不下载也没关系，听过的部分会自动保存。iPhone 请用 Safari 打开，再点分享按钮 › “添加到主屏幕”，用起来像一个 App。学习进度保存在各自设备的浏览器里。</p>
@@ -605,33 +598,6 @@ vs.addEventListener('change', e => {
 vs.addEventListener('keydown', e => { if (e.target.id === 'spin' && e.key === 'Enter') { e.preventDefault(); spCheck(); } });
 
 
-/* ---------- PDF 词书 ---------- */
-const PDF_CACHE = 'thai5000-pdf-v1';
-const PDFS = [[1,'第 1–1000 词',65,3.6],[2,'第 1001–2000 词',57,3.6],[3,'第 2001–3000 词',53,3.6],[4,'第 3001–4000 词',50,3.4],[5,'第 4001–5000 词',48,3.5]];
-const pUrl = L => new URL('L' + L + '.pdf', location.href).href;
-async function pdfSaved(){ const got = new Set(); if (!('caches' in window)) return got;
-  try { const c = await caches.open(PDF_CACHE); for (const [L] of PDFS) if (await c.match(pUrl(L))) got.add(L); } catch(e){} return got; }
-async function renderPdf(){
-  const got = await pdfSaved();
-  document.getElementById('pdflist').innerHTML = PDFS.map(([L, r, pg, mb]) => `<div class="pdf-item"><span class="lt" style="background:var(${LC[L-1]})">L${L}</span>
-    <div class="pi"><b>泰语高频核心词汇 L${L}</b><span>${r} · ${pg} 页 · ${mb}MB${got.has(L) ? ' · <span class="saved">已保存到本机</span>' : ''}</span></div>
-    <a href="L${L}.pdf" target="_blank" rel="noopener">打开</a></div>`).join('');
-  const b = document.getElementById('pdfsave'), info = document.getElementById('pdfinfo');
-  if (!('serviceWorker' in navigator) || location.protocol === 'file:') { b.hidden = true; return; }
-  if (!b.dataset.busy) { b.disabled = got.size === 5; b.textContent = got.size === 5 ? '5 本都已保存到本机' : (got.size ? '继续保存（' + got.size + '/5）' : '全部保存到本机（约 18MB）'); }
-  info.textContent = got.size === 5 ? '断网时也能打开这 5 本 PDF。' : '打开过的 PDF 会自动保存；想一次全部保存就点上面的按钮（建议连 Wi-Fi）。';
-}
-document.getElementById('pdfsave').addEventListener('click', async e => {
-  const b = e.currentTarget; b.disabled = true; b.dataset.busy = '1';
-  try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch(x){}
-  const got = await pdfSaved(); let k = 0;
-  for (const [L] of PDFS) { k++; if (got.has(L)) continue; b.textContent = '正在保存 L' + L + '（' + k + '/5）…';
-    try { const c = await caches.open(PDF_CACHE); if (!(await c.match(pUrl(L)))) { const r = await fetch(pUrl(L)); if (!r.ok) throw 0; await c.put(pUrl(L), new Response(await r.arrayBuffer(), {headers: {'Content-Type': 'application/pdf'}})); } }
-    catch(x) { document.getElementById('pdfinfo').textContent = '保存中断，请检查网络后再点一次。'; break; } }
-  delete b.dataset.busy; renderPdf();
-});
-
-
 /* ---------- 学习位置（学到这里） ---------- */
 function renderResume(){
   const m = document.getElementById('resumeMsg'), b = document.getElementById('resumeBtn');
@@ -667,13 +633,11 @@ function setView(v){
   document.getElementById('v-learn').hidden = v !== 'learn';
   document.getElementById('v-star').hidden = v !== 'star';
   document.getElementById('v-spell').hidden = v !== 'spell';
-  document.getElementById('v-pdf').hidden = v !== 'pdf';
-  document.querySelector('.offbar').hidden = v === 'pdf';
-  document.getElementById('searchbox').hidden = v === 'learn' || v === 'spell' || v === 'pdf';
-  document.getElementById('lvls').hidden = v === 'star' || v === 'pdf';
+  document.getElementById('searchbox').hidden = v === 'learn' || v === 'spell';
+  document.getElementById('lvls').hidden = v === 'star';
   render();
 }
-function render(){ if (view==='list') renderList(); else if (view==='learn') { if (!cur) renderLearn(); else { cur = null; queue = []; renderLearn(); } } else if (view==='spell') { if (sp.state === 'ask' || sp.state === 'ok' || sp.state === 'bad') { sp.state = 'idle'; sp.cur = null; sp.total = 0; } renderSpell(); } else if (view==='pdf') renderPdf(); else renderStars(); }
+function render(){ if (view==='list') renderList(); else if (view==='learn') { if (!cur) renderLearn(); else { cur = null; queue = []; renderLearn(); } } else if (view==='spell') { if (sp.state === 'ask' || sp.state === 'ok' || sp.state === 'bad') { sp.state = 'idle'; sp.cur = null; sp.total = 0; } renderSpell(); } else renderStars(); }
 document.querySelector('.tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) setView(t.dataset.v); });
 renderLevels(); setView('list');
 /* ---------- 声音检测 ---------- */
