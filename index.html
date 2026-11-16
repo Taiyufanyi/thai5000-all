@@ -184,6 +184,13 @@ html.locked body { overflow: hidden; }
 .pdf-item .pi .saved { color: var(--good); }
 .pdf-item a { text-decoration: none; border-radius: 10px; padding: 8px 16px; font-weight: 700; background: var(--accent); color: var(--accent-ink); white-space: nowrap; }
 #pdfsave:disabled { opacity: .7; }
+.resume { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; background: var(--tint); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; margin-bottom: 10px; font-size: 13px; color: var(--ink2); }
+.resume-btn { border: 0; background: var(--accent); color: var(--accent-ink); border-radius: 9px; padding: 7px 12px; font-weight: 700; font-size: 13px; }
+.resume-btn:disabled { opacity: .45; cursor: default; }
+.mark { border: 1px solid var(--line); background: var(--surface); color: var(--ink2); border-radius: 999px; height: 32px; padding: 0 10px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.mark.on { background: var(--good); border-color: var(--good); color: #fff; }
+.entry.here { border-color: var(--good); box-shadow: 0 0 0 2px color-mix(in srgb, var(--good) 35%, transparent); }
+.entry { scroll-margin-top: 190px; }
 .foot { font-size: 12px; color: var(--muted); margin-top: 26px; line-height: 1.7; }
 @media (max-width: 420px) { .wd { font-size: 23px; } .card .front .wd { font-size: 40px; } .stat b { font-size: 17px; } }
 @media (prefers-reduced-motion: no-preference) { .card { transition: box-shadow .2s; } }
@@ -249,7 +256,7 @@ html.locked body { overflow: hidden; }
     <div id="chkhelp" hidden></div>
   </div>
   <div class="offbar"><button class="say" id="offbtn">下载单词离线录音（57MB）</button><button class="say" id="offbtn2">下载例句离线录音（108MB）</button></div>
-  <section id="v-list"><div class="count" id="count"></div><div class="list" id="list"></div><button class="more" id="more" hidden>再显示 40 个</button></section>
+  <section id="v-list"><div class="resume" id="resume"><span id="resumeMsg">还没有标记学习位置。学完一个词，点词条上的“学到这里”。</span><button class="resume-btn" id="resumeBtn" disabled>继续上次学习</button></div><div class="count" id="count"></div><div class="list" id="list"></div><button class="more" id="more" hidden>再显示 40 个</button></section>
   <section id="v-learn" hidden></section>
   <section id="v-spell" hidden></section>
   <section id="v-pdf" hidden>
@@ -399,9 +406,11 @@ function head(w, big){
   return `<div class="hd"><span class="wd">${esc(w[1])}</span>${w[2]?`<span class="ip">/${esc(w[2])}/</span>`:''}
     <span class="no">No.${String(w[0]).padStart(4,'0')}</span><span class="lt" style="background:var(${LC[L-1]})">L${L}</span>
     <span class="hdr"><button class="say" data-say="${esc(w[1])}" data-a="w/${String(w[0]).padStart(4,'0')}.mp3" aria-label="朗读单词">${SPK}</button>
-    <button class="star" data-star="${w[0]}" aria-pressed="${stars.has(w[0])}" aria-label="加入生词本">★</button></span></div>`;
+    <button class="star" data-star="${w[0]}" aria-pressed="${stars.has(w[0])}" aria-label="加入生词本">★</button>
+    <button class="mark${pos && pos.n === w[0] ? ' on' : ''}" data-mark="${w[0]}">${pos && pos.n === w[0] ? '✓ 已标记' : '学到这里'}</button></span></div>`;
 }
-const entry = w => `<article class="entry">${head(w)}${senses(w)}</article>`;
+const entry = w => `<article class="entry${pos && pos.n === w[0] ? ' here' : ''}" id="w${w[0]}">${head(w)}${senses(w)}</article>`;
+let pos = store.get('pos', null);
 
 function filtered(){
   const t = q.trim();
@@ -411,6 +420,7 @@ function filtered(){
   return W.filter(w => w[1].includes(t) || w[3].some(s => s[1].includes(t)) || (w[2] && w[2].normalize('NFD').replace(/[̀-ͯ]/g,'').includes(tl)));
 }
 function renderList(){
+  renderResume();
   const arr = filtered();
   document.getElementById('count').textContent = q.trim() ? `搜索“${q.trim()}”：${arr.length} 个结果` : `L${level}：第 ${(level-1)*1000+1}–${level*1000} 词，共 ${arr.length} 个`;
   document.getElementById('list').innerHTML = arr.length ? arr.slice(0, shown).map(entry).join('') : '<div class="empty">没有找到匹配的词。可以试试泰语原词、中文意思或词号。</div>';
@@ -598,14 +608,14 @@ vs.addEventListener('keydown', e => { if (e.target.id === 'spin' && e.key === 'E
 /* ---------- PDF 词书 ---------- */
 const PDF_CACHE = 'thai5000-pdf-v1';
 const PDFS = [[1,'第 1–1000 词',65,3.6],[2,'第 1001–2000 词',57,3.6],[3,'第 2001–3000 词',53,3.6],[4,'第 3001–4000 词',50,3.4],[5,'第 4001–5000 词',48,3.5]];
-const pUrl = L => new URL('pdf/L' + L + '.pdf', location.href).href;
+const pUrl = L => new URL('L' + L + '.pdf', location.href).href;
 async function pdfSaved(){ const got = new Set(); if (!('caches' in window)) return got;
   try { const c = await caches.open(PDF_CACHE); for (const [L] of PDFS) if (await c.match(pUrl(L))) got.add(L); } catch(e){} return got; }
 async function renderPdf(){
   const got = await pdfSaved();
   document.getElementById('pdflist').innerHTML = PDFS.map(([L, r, pg, mb]) => `<div class="pdf-item"><span class="lt" style="background:var(${LC[L-1]})">L${L}</span>
     <div class="pi"><b>泰语高频核心词汇 L${L}</b><span>${r} · ${pg} 页 · ${mb}MB${got.has(L) ? ' · <span class="saved">已保存到本机</span>' : ''}</span></div>
-    <a href="pdf/L${L}.pdf" target="_blank" rel="noopener">打开</a></div>`).join('');
+    <a href="L${L}.pdf" target="_blank" rel="noopener">打开</a></div>`).join('');
   const b = document.getElementById('pdfsave'), info = document.getElementById('pdfinfo');
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') { b.hidden = true; return; }
   if (!b.dataset.busy) { b.disabled = got.size === 5; b.textContent = got.size === 5 ? '5 本都已保存到本机' : (got.size ? '继续保存（' + got.size + '/5）' : '全部保存到本机（约 18MB）'); }
@@ -619,6 +629,34 @@ document.getElementById('pdfsave').addEventListener('click', async e => {
     try { const c = await caches.open(PDF_CACHE); if (!(await c.match(pUrl(L)))) { const r = await fetch(pUrl(L)); if (!r.ok) throw 0; await c.put(pUrl(L), new Response(await r.arrayBuffer(), {headers: {'Content-Type': 'application/pdf'}})); } }
     catch(x) { document.getElementById('pdfinfo').textContent = '保存中断，请检查网络后再点一次。'; break; } }
   delete b.dataset.busy; renderPdf();
+});
+
+
+/* ---------- 学习位置（学到这里） ---------- */
+function renderResume(){
+  const m = document.getElementById('resumeMsg'), b = document.getElementById('resumeBtn');
+  const w = pos && W[pos.n - 1];
+  b.disabled = !w;
+  m.textContent = w ? `上次学到：L${lvlOf(w[0])} · No.${String(w[0]).padStart(4,'0')} · ${w[1]}（${(w[3][0]||[])[1]||''}）` : '还没有标记学习位置。学完一个词，点词条上的“学到这里”。';
+}
+document.addEventListener('click', e => {
+  const m = e.target.closest('[data-mark]'); if (!m) return;
+  const n = +m.dataset.mark;
+  pos = (pos && pos.n === n) ? null : {n, t: Date.now()};
+  store.set('pos', pos);
+  document.querySelectorAll('.entry.here').forEach(x => x.classList.remove('here'));
+  document.querySelectorAll('[data-mark]').forEach(x => { const on = pos && +x.dataset.mark === pos.n; x.classList.toggle('on', !!on); x.textContent = on ? '✓ 已标记' : '学到这里'; });
+  if (pos) { const el = document.getElementById('w' + n); if (el) el.classList.add('here'); }
+  renderResume();
+});
+document.getElementById('resumeBtn').addEventListener('click', () => {
+  if (!pos) return;
+  const n = pos.n;
+  q = ''; document.getElementById('q').value = '';
+  level = lvlOf(n); store.set('level', level); renderLevels(); loadLevel(level).catch(() => {});
+  shown = Math.max(40, Math.ceil(((n - 1) % 1000 + 6) / 40) * 40);
+  setView('list');
+  requestAnimationFrame(() => { const el = document.getElementById('w' + n); if (el) el.scrollIntoView({block: 'start', behavior: 'smooth'}); });
 });
 
 /* ---------- views ---------- */
