@@ -1,5 +1,6 @@
 // 离线缓存：页面用“联网优先、断网用缓存”，录音用“缓存优先”
-const SHELL_CACHE = 'thai5000-shell-v2';
+const SHELL_CACHE = 'thai5000-shell-v3';
+const PDF_CACHE = 'thai5000-pdf-v1';
 const AUDIO_CACHE = 'thai5000-audio-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
@@ -7,7 +8,7 @@ self.addEventListener('install', e => {
   e.waitUntil(caches.open(SHELL_CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== SHELL_CACHE && k !== AUDIO_CACHE).map(k => caches.delete(k))))
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== SHELL_CACHE && k !== AUDIO_CACHE && k !== PDF_CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
@@ -15,8 +16,8 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
-  if (url.pathname.includes('/audio/')) {
-    e.respondWith(caches.open(AUDIO_CACHE).then(async c => {
+  if (url.pathname.includes('/audio/') || url.pathname.includes('/pdf/')) {
+    e.respondWith(caches.open(url.pathname.includes('/pdf/') ? PDF_CACHE : AUDIO_CACHE).then(async c => {
       const hit = await c.match(req, {ignoreSearch: true});
       if (hit) return hit;
       const res = await fetch(req);
